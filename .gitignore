@@ -38,5 +38,6 @@ yarn-error.*
 app-example
 
 ._*
-ios
-android
+/ios
+/android
+modules/*/android/build
