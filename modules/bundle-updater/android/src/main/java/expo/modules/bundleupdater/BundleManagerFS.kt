@@ -9,6 +9,15 @@ class BundlePreferencesStorage(private val context: Context) {
         private const val STORE_FILENAME = "_RNBundleUpdater"
         private const val BUNDLE_VERSION = "_RNBundleUpdater_bundleVersion"
         private const val APP_VERSION = "_RNBundleUpdater_appVersion"
+
+        @Volatile
+        private var instance: BundlePreferencesStorage? = null
+
+        fun getInstance(context: Context): BundlePreferencesStorage {
+            return instance ?: synchronized(this) {
+                instance ?: BundlePreferencesStorage(context).also { instance = it }
+            }
+        }
     }
 
     fun getPreferences(): PreferenceData {

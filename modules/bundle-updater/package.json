@@ -1,0 +1,40 @@
+{
+  "name": "expo-bundle-updater",
+  "version": "1.0.0",
+  "description": "Bundle updater module for Expo",
+  "main": "build/index.js",
+  "types": "build/index.d.ts",
+  "scripts": {
+    "build": "expo-module build",
+    "clean": "expo-module clean",
+    "test": "expo-module test",
+    "prepare": "expo-module prepare",
+    "prepublishOnly": "expo-module prepublishOnly",
+    "expo-module": "expo-module"
+  },
+  "keywords": [
+    "react-native",
+    "expo",
+    "expo-bundle-updater"
+  ],
+  "repository": "https://github.com/yourusername/expo-bundle-updater",
+  "bugs": {
+    "url": "https://github.com/yourusername/expo-bundle-updater/issues"
+  },
+  "author": "your-name",
+  "license": "MIT",
+  "dependencies": {},
+  "devDependencies": {
+    "expo-module-scripts": "^3.0.0"
+  },
+  "peerDependencies": {
+    "expo": "*"
+  },
+  "expo": {
+    "autolinking": {
+      "android": {
+        "mainApplication": true
+      }
+    }
+  }
+} 

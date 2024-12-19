@@ -10,65 +10,82 @@ import java.io.File
 class BundleUpdaterModule : Module() {
     companion object {
         private const val NAME = "BundleUpdater"
+        
         fun getBundlePath(ctx: Context): File {
             return File(ctx.filesDir.path + "/index.android.custom.bundle")
         }
-    }
 
-    private val mContext = appContext.reactContext
-        ?: throw IllegalStateException("React context is not available")
+        fun getJSBundleFile(context: Context): String? {
+            val bundlePath = getBundlePath(context)
+            val preferencesStorage = BundlePreferencesStorage.getInstance(context)
+            val prefs = preferencesStorage.getPreferences()
+            
+            try {
+                val pInfo = context.packageManager?.getPackageInfo(context.packageName ?: "", 0)
+                val currentAppVersion = pInfo?.versionName ?: ""
 
-    private val preferencesStorage by lazy {
-        BundlePreferencesStorage(mContext)
+                // Valida se o bundle é compatível com a versão atual do app
+                if (prefs.appVersion == currentAppVersion && bundlePath.exists()) {
+                    Log.d(NAME, "Custom bundle found, using it...")
+                    return bundlePath.path
+                }
+
+                // Limpa o bundle se estiver desatualizado
+                if (prefs.bundleVersion.isNotEmpty() || bundlePath.exists()) {
+                    Log.d(NAME, "Removing obsolete bundle...")
+                    FSUtil.removeFile(bundlePath)
+                    Log.d(NAME, "Clearing storage...")
+                    preferencesStorage.clearPreferences()
+                }
+            } catch (e: Exception) {
+                Log.e(NAME, "Error validating bundle: ${e.message}")
+            }
+
+            Log.d(NAME, "Custom bundle not found or invalid, using default bundle")
+            return null
+        }
     }
 
     private fun getAppVersion(): String {
+        val context = appContext.reactContext
+        if (context == null) {
+            Log.e(NAME, "React Context is not available")
+            return ""
+        }
         return try {
-            val pInfo = mContext.packageManager.getPackageInfo(mContext.packageName, 0)
-            pInfo.versionName ?: ""
+            val pInfo = context.packageManager?.getPackageInfo(context.packageName ?: "", 0)
+            pInfo?.versionName ?: ""
         } catch (e: PackageManager.NameNotFoundException) {
             ""
         }
     }
 
-    fun getBundleUrl(): String? {
-        val isValid = this.validateBundle()
-
-        if(isValid) {
-            Log.d(NAME, "Custom bundle found, using it...")
-            return getBundlePath(mContext).path
-        }
-
-        Log.d(NAME, "Custom bundle not found, using default bundle")
-        return null
-    }
-    
     private fun clearBundle() {
-      Log.d(NAME, "Removing obsolete bundle...")
-        FSUtil.removeFile(getBundlePath(mContext))
-        Log.d(NAME, "Clearing storage...")
-        preferencesStorage.clearPreferences()
-    }
-
-    private fun validateBundle(): Boolean {
-        val currentAppVersion = getAppVersion()
-        val prefs = preferencesStorage.getPreferences()
-
-        if (prefs.appVersion == currentAppVersion && getBundlePath(mContext).exists()) return true
-
-        if (prefs.bundleVersion.isNotEmpty() || getBundlePath(mContext).exists()) {
-            clearBundle()
+        val context = appContext.reactContext
+        if (context != null) {
+            val preferencesStorage = BundlePreferencesStorage.getInstance(context)
+            Log.d(NAME, "Removing obsolete bundle...")
+            FSUtil.removeFile(getBundlePath(context))
+            Log.d(NAME, "Clearing storage...")
+            preferencesStorage.clearPreferences()
+        } else {
+            Log.e(NAME, "React Context is not available")
+            return
         }
-
-        return false
     }
 
     override fun definition() = ModuleDefinition {
         Name("BundleUpdater")
 
         AsyncFunction("getBundleInfo") {
+            val context = appContext.reactContext
+            if (context == null) {
+                Log.e(NAME, "React Context is not available")
+                return@AsyncFunction null
+            }
+            val preferencesStorage = BundlePreferencesStorage.getInstance(context)
             val prefs = preferencesStorage.getPreferences()
-            val bundlePath = getBundlePath(mContext)
+            val bundlePath = getBundlePath(context)
             mapOf(
                 "currentAppVersion" to getAppVersion(),
                 "bundleVersion" to prefs.bundleVersion,
@@ -78,14 +95,20 @@ class BundleUpdaterModule : Module() {
         }
 
         AsyncFunction("applyBundle") { bundlePath: String, bundleVersion: String ->
-            if (getBundlePath(mContext).exists()) {
-                getBundlePath(mContext).delete()
+            val context = appContext.reactContext
+            if (context == null) {
+                Log.e(NAME, "React Context is not available")
+                return@AsyncFunction null
             }
-            FSUtil.moveWithOverride(bundlePath, getBundlePath(mContext).path)
+            val preferencesStorage = BundlePreferencesStorage.getInstance(context)
+            if (getBundlePath(context).exists()) {
+                getBundlePath(context).delete()
+            }
+            FSUtil.moveWithOverride(bundlePath, getBundlePath(context).path)
             preferencesStorage.savePreferences(
                 PreferenceData(getAppVersion(), bundleVersion)
             )
-            getBundlePath(mContext).path
+            getBundlePath(context).path
         }
 
         Function("clearBundle") {

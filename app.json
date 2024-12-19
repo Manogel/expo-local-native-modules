@@ -34,7 +34,8 @@
           "resizeMode": "contain",
           "backgroundColor": "#ffffff"
         }
-      ]
+      ],
+      "./modules/bundle-updater/app.plugin.js"
     ],
     "experiments": {
       "typedRoutes": true
