@@ -1,10 +1,10 @@
-import { Image, StyleSheet, Platform } from 'react-native';
+import { Image, StyleSheet, Platform, TouchableOpacity } from 'react-native';
 
 import { HelloWave } from '@/components/HelloWave';
 import ParallaxScrollView from '@/components/ParallaxScrollView';
 import { ThemedText } from '@/components/ThemedText';
 import { ThemedView } from '@/components/ThemedView';
-
+import BundleUpdater from '@/modules/bundle-updater';
 export default function HomeScreen() {
   return (
     <ParallaxScrollView
@@ -19,6 +19,26 @@ export default function HomeScreen() {
         <ThemedText type="title">Welcome!</ThemedText>
         <HelloWave />
       </ThemedView>
+
+
+      <TouchableOpacity onPress={() => {
+        BundleUpdater.applyBundle('https://example.com/bundle.zip', '1');
+      }}>
+        <ThemedText>Apply Bundle</ThemedText>
+      </TouchableOpacity>
+      <TouchableOpacity onPress={() => {
+        BundleUpdater.clearBundle();
+      }}>
+        <ThemedText>Clear Bundle</ThemedText>
+      </TouchableOpacity>
+
+      <TouchableOpacity onPress={async () => {
+        const info = await BundleUpdater.getBundleInfo();
+        console.log(JSON.stringify(info, null, 2));
+      }}>
+        <ThemedText>Get Bundle Info</ThemedText>
+      </TouchableOpacity>
+
       <ThemedView style={styles.stepContainer}>
         <ThemedText type="subtitle">Step 1: Try it</ThemedText>
         <ThemedText>

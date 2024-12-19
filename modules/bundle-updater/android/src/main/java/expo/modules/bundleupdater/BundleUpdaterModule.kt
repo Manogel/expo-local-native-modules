@@ -1,50 +1,95 @@
 package expo.modules.bundleupdater
 
+import android.content.Context
+import android.content.pm.PackageManager
+import android.util.Log
 import expo.modules.kotlin.modules.Module
 import expo.modules.kotlin.modules.ModuleDefinition
-import java.net.URL
+import java.io.File
 
 class BundleUpdaterModule : Module() {
-  // Each module class must implement the definition function. The definition consists of components
-  // that describes the module's functionality and behavior.
-  // See https://docs.expo.dev/modules/module-api for more details about available components.
-  override fun definition() = ModuleDefinition {
-    // Sets the name of the module that JavaScript code will use to refer to the module. Takes a string as an argument.
-    // Can be inferred from module's class name, but it's recommended to set it explicitly for clarity.
-    // The module will be accessible from `requireNativeModule('BundleUpdater')` in JavaScript.
-    Name("BundleUpdater")
-
-    // Sets constant properties on the module. Can take a dictionary or a closure that returns a dictionary.
-    Constants(
-      "PI" to Math.PI
-    )
-
-    // Defines event names that the module can send to JavaScript.
-    Events("onChange")
-
-    // Defines a JavaScript synchronous function that runs the native code on the JavaScript thread.
-    Function("hello") {
-      "Hello world! 👋"
+    companion object {
+        private const val NAME = "BundleUpdater"
+        fun getBundlePath(ctx: Context): File {
+            return File(ctx.filesDir.path + "/index.android.custom.bundle")
+        }
     }
 
-    // Defines a JavaScript function that always returns a Promise and whose native code
-    // is by default dispatched on the different thread than the JavaScript runtime runs on.
-    AsyncFunction("setValueAsync") { value: String ->
-      // Send an event to JavaScript.
-      sendEvent("onChange", mapOf(
-        "value" to value
-      ))
+    private val mContext = appContext.reactContext
+        ?: throw IllegalStateException("React context is not available")
+
+    private val preferencesStorage by lazy {
+        BundlePreferencesStorage(mContext)
     }
 
-    // Enables the module to be used as a native view. Definition components that are accepted as part of
-    // the view definition: Prop, Events.
-    View(BundleUpdaterView::class) {
-      // Defines a setter for the `url` prop.
-      Prop("url") { view: BundleUpdaterView, url: URL ->
-        view.webView.loadUrl(url.toString())
-      }
-      // Defines an event that the view can send to JavaScript.
-      Events("onLoad")
+    private fun getAppVersion(): String {
+        return try {
+            val pInfo = mContext.packageManager.getPackageInfo(mContext.packageName, 0)
+            pInfo.versionName ?: ""
+        } catch (e: PackageManager.NameNotFoundException) {
+            ""
+        }
     }
-  }
+
+    fun getBundleUrl(): String? {
+        val isValid = this.validateBundle()
+
+        if(isValid) {
+            Log.d(NAME, "Custom bundle found, using it...")
+            return getBundlePath(mContext).path
+        }
+
+        Log.d(NAME, "Custom bundle not found, using default bundle")
+        return null
+    }
+    
+    private fun clearBundle() {
+      Log.d(NAME, "Removing obsolete bundle...")
+        FSUtil.removeFile(getBundlePath(mContext))
+        Log.d(NAME, "Clearing storage...")
+        preferencesStorage.clearPreferences()
+    }
+
+    private fun validateBundle(): Boolean {
+        val currentAppVersion = getAppVersion()
+        val prefs = preferencesStorage.getPreferences()
+
+        if (prefs.appVersion == currentAppVersion && getBundlePath(mContext).exists()) return true
+
+        if (prefs.bundleVersion.isNotEmpty() || getBundlePath(mContext).exists()) {
+            clearBundle()
+        }
+
+        return false
+    }
+
+    override fun definition() = ModuleDefinition {
+        Name("BundleUpdater")
+
+        AsyncFunction("getBundleInfo") {
+            val prefs = preferencesStorage.getPreferences()
+            val bundlePath = getBundlePath(mContext)
+            mapOf(
+                "currentAppVersion" to getAppVersion(),
+                "bundleVersion" to prefs.bundleVersion,
+                "haveBundleSaved" to bundlePath.exists(),
+                "bundlePath" to bundlePath.path
+            )
+        }
+
+        AsyncFunction("applyBundle") { bundlePath: String, bundleVersion: String ->
+            if (getBundlePath(mContext).exists()) {
+                getBundlePath(mContext).delete()
+            }
+            FSUtil.moveWithOverride(bundlePath, getBundlePath(mContext).path)
+            preferencesStorage.savePreferences(
+                PreferenceData(getAppVersion(), bundleVersion)
+            )
+            getBundlePath(mContext).path
+        }
+
+        Function("clearBundle") {
+            clearBundle()
+        }
+    }
 }

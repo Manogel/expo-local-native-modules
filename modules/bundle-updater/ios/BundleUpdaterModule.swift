@@ -10,39 +10,33 @@ public class BundleUpdaterModule: Module {
     // The module will be accessible from `requireNativeModule('BundleUpdater')` in JavaScript.
     Name("BundleUpdater")
 
-    // Sets constant properties on the module. Can take a dictionary or a closure that returns a dictionary.
-    Constants([
-      "PI": Double.pi
-    ])
-
-    // Defines event names that the module can send to JavaScript.
-    Events("onChange")
-
     // Defines a JavaScript synchronous function that runs the native code on the JavaScript thread.
-    Function("hello") {
-      return "Hello world! 👋"
+    Function("applyBundle") { (bundlePath: String, bundleVersion: String) in
+      // log the bundle path and version
+      print("[NativeSide] bundlePath: \(bundlePath), bundleVersion: \(bundleVersion)")
     }
 
-    // Defines a JavaScript function that always returns a Promise and whose native code
-    // is by default dispatched on the different thread than the JavaScript runtime runs on.
-    AsyncFunction("setValueAsync") { (value: String) in
-      // Send an event to JavaScript.
-      self.sendEvent("onChange", [
-        "value": value
-      ])
+    AsyncFunction("getBundleInfo") { () -> [String: Any] in
+        print("[NativeSide] getBundleInfo")
+        
+        // Get current app version from main bundle
+        let currentAppVersion = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "unknown"
+        
+        // TODO: These values should be retrieved from your actual bundle storage mechanism
+        let bundleVersion = "1.0.0" // Replace with actual stored bundle version
+        let haveBundleSaved = false // Replace with actual check if bundle exists
+        let bundlePath = "" // Replace with actual bundle path if it exists
+        
+        return [
+            "currentAppVersion": currentAppVersion,
+            "bundleVersion": bundleVersion,
+            "haveBundleSaved": haveBundleSaved,
+            "bundlePath": bundlePath
+        ]
     }
 
-    // Enables the module to be used as a native view. Definition components that are accepted as part of the
-    // view definition: Prop, Events.
-    View(BundleUpdaterView.self) {
-      // Defines a setter for the `url` prop.
-      Prop("url") { (view: BundleUpdaterView, url: URL) in
-        if view.webView.url != url {
-          view.webView.load(URLRequest(url: url))
-        }
-      }
-
-      Events("onLoad")
+    Function("clearBundle") {
+      print("[NativeSide] clearBundle")
     }
   }
 }
