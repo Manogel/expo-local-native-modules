@@ -2,16 +2,17 @@
 Object.defineProperty(exports, "__esModule", { value: true });
 const config_plugins_1 = require("@expo/config-plugins");
 const withBundleUpdater = (config) => {
-    return (0, config_plugins_1.withMainApplication)(config, async (config) => {
+    // Handle Android modifications
+    config = (0, config_plugins_1.withMainApplication)(config, async (config) => {
         const mainApplication = config.modResults;
-        console.log('[BundleUpdater] Starting plugin configuration...');
-        // Adiciona os imports necessários
+        console.log('[BundleUpdater] Starting Android plugin configuration...');
+        // Add imports
         if (!mainApplication.contents.includes('import expo.modules.bundleupdater.BundleUpdaterModule')) {
             console.log('[BundleUpdater] Adding import statement...');
             mainApplication.contents = mainApplication.contents.replace(/import com\.facebook\.react\.ReactApplication/, `import com.facebook.react.ReactApplication\nimport expo.modules.bundleupdater.BundleUpdaterModule`);
             console.log('[BundleUpdater] Import added successfully');
         }
-        // Modifica o getJSBundleFile para incluir nossa lógica
+        // Modify getJSBundleFile
         if (!mainApplication.contents.includes('override fun getJSBundleFile')) {
             console.log('[BundleUpdater] Adding getJSBundleFile override...');
             const hostPattern = /object\s*:\s*DefaultReactNativeHost\(this\)\s*{([^}]*)}/s;
@@ -37,8 +38,42 @@ const withBundleUpdater = (config) => {
             mainApplication.contents = mainApplication.contents.replace(hostPattern, replacement);
             console.log('[BundleUpdater] Override added successfully');
         }
-        console.log('[BundleUpdater] Plugin configuration completed');
+        console.log('[BundleUpdater] Android plugin configuration completed');
         return config;
     });
+    // Handle iOS modifications
+    config = (0, config_plugins_1.withAppDelegate)(config, async (config) => {
+        const appDelegate = config.modResults;
+        console.log('[BundleUpdater] Starting iOS plugin configuration...');
+        // Add import
+        if (!appDelegate.contents.includes('#import "BundleUpdater.h"')) {
+            console.log('[BundleUpdater] Adding import statement...');
+            appDelegate.contents = appDelegate.contents.replace(/#import <React\/RCTLinkingManager\.h>/, `#import <React/RCTLinkingManager.h>\n#import "BundleUpdater.h"`);
+            console.log('[BundleUpdater] Import added successfully');
+        }
+        // Modify sourceURLForBridge method
+        if (!appDelegate.contents.includes('customBundleURL = [BundleUpdater getBundleURL]')) {
+            console.log('[BundleUpdater] Modifying sourceURLForBridge method...');
+            const sourceURLPattern = /- \(NSURL \*\)sourceURLForBridge:\(RCTBridge \*\)bridge\s*{[^}]*}/s;
+            const replacement = `- (NSURL *)sourceURLForBridge:(RCTBridge *)bridge
+{
+#if DEBUG
+  return [[RCTBundleURLProvider sharedSettings] jsBundleURLForBundleRoot:@".expo/.virtual-metro-entry"];
+#else
+  NSURL *customBundleURL = [BundleUpdater getBundleURL];
+  if (customBundleURL) {
+    return customBundleURL;
+  }
+  NSLog(@"[BundleUpdater] Using default bundle");
+  return [[NSBundle mainBundle] URLForResource:@"main" withExtension:@"jsbundle"];
+#endif
+}`;
+            appDelegate.contents = appDelegate.contents.replace(sourceURLPattern, replacement);
+            console.log('[BundleUpdater] sourceURLForBridge method modified successfully');
+        }
+        console.log('[BundleUpdater] iOS plugin configuration completed');
+        return config;
+    });
+    return config;
 };
 exports.default = withBundleUpdater;
